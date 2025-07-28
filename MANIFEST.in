@@ -1,0 +1,25 @@
+# 包含所有必要的文件
+include README.md
+include LICENSE
+include requirements.txt
+include pyproject.toml
+include node_list.json
+include install.py
+include settings.json
+include prompts.json
+
+# 包含所有Python文件
+recursive-include nodes *.py
+recursive-include js *.js
+
+# 包含文档文件
+include README_PROMPT_MANAGEMENT.md
+
+# 排除不必要的文件
+exclude .gitignore
+exclude *.pyc
+exclude *.pyo
+exclude *~
+exclude .DS_Store
+global-exclude __pycache__
+global-exclude *.py[cod]

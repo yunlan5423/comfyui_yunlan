@@ -13,16 +13,18 @@
 
 ## 安装方法
 
-### 方法一：使用ComfyUI Manager
+### 方法一：使用ComfyUI Manager（推荐）
 
 1. 在ComfyUI中安装并启用ComfyUI Manager
-2. 在Manager中搜索"YunLanFY"并点击安装
+2. 在Manager中搜索"云岚AI"、"yunlan5423"或"comfyui-yunlan"
+3. 点击安装，Manager会自动下载并安装所有依赖
+4. 重启ComfyUI即可使用
 
 ### 方法二：手动安装
 
 ```bash
 cd /path/to/ComfyUI/custom_nodes
-git clone https://github.com/yunlanfy/comfyui_yunlan.git
+git clone https://github.com/yunlan5423/comfyui_yunlan.git
 cd comfyui_yunlan
 # 安装依赖
 pip install -r requirements.txt
@@ -131,6 +133,25 @@ comfyui_yunlan/
 
 在`js/yunlanfy.js`中可以添加自定义UI组件和交互逻辑。
 
+## ComfyUI Manager 支持
+
+本插件完全支持ComfyUI Manager，包含以下特性：
+
+- ✅ 自动依赖安装
+- ✅ 节点信息自动识别
+- ✅ 一键安装和卸载
+- ✅ 版本管理
+- ✅ 更新检查
+
+### 节点信息
+
+| 节点名称 | 功能描述 | 分类 |
+|---------|---------|------|
+| 云岚_AI对话 | 支持多种AI模型的对话功能 | 云岚AI |
+| 云岚_条件选图 | 动态图像选择器 | 云岚AI |
+| 云岚_条件选词 | 动态文本选择器 | 云岚AI |
+| 云岚_拼图 | 图像拼接节点 | 云岚AI |
+
 ## 依赖要求
 
 - Python 3.7+
@@ -138,8 +159,8 @@ comfyui_yunlan/
 - openai >= 1.0.0
 - requests >= 2.25.0
 - Pillow >= 8.0.0
-- torch
-- numpy
+- torch（通常由ComfyUI提供）
+- numpy（通常由ComfyUI提供）
 
 ## 许可证
 
@@ -147,6 +168,6 @@ MIT
 
 ## 联系方式
 
-GitHub: [https://github.com/yunlanfy/comfyui_yunlan](https://github.com/yunlanfy/comfyui_yunlan)
+GitHub: [https://github.com/yunlan5423/comfyui_yunlan](https://github.com/yunlan5423/comfyui_yunlan)
 
 如有问题或建议，请提交Issue或PR。

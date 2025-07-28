@@ -1,6 +1,6 @@
 {
     "apiUrl": "https://yunwu.ai/v1",
-    "apiKey": "sk-9q7eNXj3vuQPQnamy4QeSrxdTrDusQ44X1Vhg9oWtwmAFnqZ",
+    "apiKey": "",
     "modelList": [
         "gpt-4o",
         "gpt-4o-mini",

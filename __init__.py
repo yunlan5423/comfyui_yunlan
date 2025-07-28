@@ -1,7 +1,17 @@
 """
 ComfyUI-云岚AI
-一个功能丰富的ComfyUI自定义节点集合
+一个功能丰富的ComfyUI自定义节点集合，专注于AI对话和智能图像处理功能
+
+Author: yunlan5423
+GitHub: https://github.com/yunlan5423/comfyui_yunlan
+Version: 1.0.0
 """
+
+# ComfyUI Manager 元数据
+__version__ = "1.0.0"
+__author__ = "yunlan5423"
+__description__ = "一个功能丰富的ComfyUI自定义节点集合，专注于AI对话和智能图像处理功能"
+__license__ = "MIT"
 
 import os
 import json

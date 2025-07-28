@@ -1,0 +1,59 @@
+{
+    "云岚_AI对话": {
+        "display_name": "云岚_AI对话",
+        "description": "支持多种AI模型的对话功能，可处理文本和图像输入",
+        "category": "云岚AI",
+        "input_types": {
+            "required": {
+                "模型": "STRING",
+                "提示词": "STRING", 
+                "附加文本": "STRING"
+            },
+            "optional": {
+                "图片1": "IMAGE",
+                "图片2": "IMAGE"
+            }
+        },
+        "output_types": ["STRING", "IMAGE"],
+        "output_names": ["文本", "图片"]
+    },
+    "云岚_条件选图": {
+        "display_name": "云岚_条件选图",
+        "description": "动态图像选择器，支持多个图像输入端口和智能索引选择",
+        "category": "云岚AI",
+        "input_types": {
+            "required": {
+                "选择": "INT"
+            }
+        },
+        "output_types": ["IMAGE"],
+        "output_names": ["图片"]
+    },
+    "云岚_条件选词": {
+        "display_name": "云岚_条件选词", 
+        "description": "动态文本选择器，支持多个文本输入端口和智能索引选择",
+        "category": "云岚AI",
+        "input_types": {
+            "required": {
+                "选择": "INT"
+            }
+        },
+        "output_types": ["STRING"],
+        "output_names": ["文本"]
+    },
+    "云岚_拼图": {
+        "display_name": "云岚_拼图",
+        "description": "图像拼接节点，支持上下左右四个方向拼接，自动调整图像尺寸",
+        "category": "云岚AI",
+        "input_types": {
+            "required": {
+                "原图": "IMAGE",
+                "拼接图片": "IMAGE",
+                "拼接方向": "STRING",
+                "原图最大尺寸": "INT"
+            }
+        },
+        "output_types": ["IMAGE"],
+        "output_names": ["图片"]
+    }
+}
