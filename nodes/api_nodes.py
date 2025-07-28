@@ -22,13 +22,49 @@ except ImportError:
     print("[云岚AI] 错误: 缺少 Pillow 库，请运行: pip install Pillow>=8.0.0")
     Image = None
 
+try:
+    import torch
+except ImportError:
+    print("[云岚AI] 错误: 缺少 PyTorch 库，这通常由ComfyUI提供")
+    torch = None
+
+try:
+    import numpy as np
+except ImportError:
+    print("[云岚AI] 错误: 缺少 NumPy 库，这通常由ComfyUI提供")
+    np = None
+
 import json
 import base64
 import io
-import torch
-import numpy as np
 
-from .. import get_api_settings, get_prompts
+# 安全导入父模块的函数
+try:
+    from .. import get_api_settings, get_prompts
+except ImportError as e:
+    print(f"[云岚AI] 警告: 无法导入父模块函数 - {e}")
+    # 提供备用函数
+    def get_api_settings():
+        return {}
+    def get_prompts():
+        return {"默认提示词": ""}
+
+# 通用辅助函数
+def create_empty_image():
+    """创建空的图像tensor，如果torch不可用则返回None"""
+    if torch is not None:
+        return torch.zeros((1, 64, 64, 3), dtype=torch.float32, device="cpu")
+    else:
+        print("[云岚AI] 警告: PyTorch不可用，无法创建图像tensor")
+        return None
+
+def safe_return_with_image(text_result):
+    """安全地返回带图像的结果，处理torch不可用的情况"""
+    empty_img = create_empty_image()
+    if empty_img is not None:
+        return (text_result, empty_img)
+    else:
+        return (text_result,)
 
 # Helper function to sanitize the base URL
 def sanitize_base_url(url):
@@ -53,6 +89,10 @@ def tensor_to_base64(tensor):
     try:
         if Image is None:
             raise ImportError("PIL库未安装")
+        if torch is None:
+            raise ImportError("PyTorch库未安装")
+        if np is None:
+            raise ImportError("NumPy库未安装")
 
         # Convert tensor to numpy array
         np_array = tensor.squeeze(0).cpu().numpy()
@@ -145,23 +185,27 @@ class YunlanAIDialog:
 
     def run_dialog(self, 模型, 提示词, 附加文本, 图片1=None, 图片2=None, prompt_id=None, node_id=None, preview=None):
         base_url = None  # Define for access in exception handlers
+
         try:
-            # 检查依赖
+            # 检查关键依赖
             if openai is None:
-                return ("错误: OpenAI库未安装，请运行: pip install openai>=1.0.0", torch.zeros((1, 64, 64, 3)))
+                return safe_return_with_image("错误: OpenAI库未安装，请运行: pip install openai>=1.0.0")
+
+            if torch is None:
+                return ("错误: PyTorch库未安装，这通常由ComfyUI提供",)
 
             # 1. 加载并修正设置
             settings = get_api_settings()
             if not settings:
-                return ("错误: 无法加载API设置，请检查settings.json文件。", torch.zeros((1, 64, 64, 3)))
+                return safe_return_with_image("错误: 无法加载API设置，请检查settings.json文件。")
 
             api_key = settings.get("apiKey")
             raw_base_url = settings.get("apiUrl")
 
             if not api_key:
-                return ("错误: 请在settings.json中配置API Key。", torch.zeros((1, 64, 64, 3)))
+                return safe_return_with_image("错误: 请在settings.json中配置API Key。")
             if not raw_base_url:
-                return ("错误: 请在settings.json中配置API URL。", torch.zeros((1, 64, 64, 3)))
+                return safe_return_with_image("错误: 请在settings.json中配置API URL。")
 
             base_url = sanitize_base_url(raw_base_url)
             print(f"[云岚AI] 原始API URL: '{raw_base_url}', 修正后URL: '{base_url}'")
@@ -170,7 +214,7 @@ class YunlanAIDialog:
             try:
                 client = openai.OpenAI(api_key=api_key, base_url=base_url)
             except Exception as e:
-                return (f"错误: 无法初始化OpenAI客户端 - {e}", torch.zeros((1, 64, 64, 3)))
+                return safe_return_with_image(f"错误: 无法初始化OpenAI客户端 - {e}")
 
             # 3. 构建提示
             try:
@@ -227,32 +271,32 @@ class YunlanAIDialog:
 
             # 6. 返回结果
             output_text = ai_response
-            output_image = torch.zeros((1, 64, 64, 3), dtype=torch.float32, device="cpu")
-            
+            output_image = create_empty_image()
+
             return (output_text, output_image)
-        
+
         except openai.APIConnectionError as e:
             error_msg = f"API连接错误: 无法连接到 {base_url or '未定义的URL'}。请检查API URL和网络连接。"
             print(f"[云岚AI] {error_msg} - {e}")
-            return (error_msg, torch.zeros((1, 64, 64, 3)))
+            return safe_return_with_image(error_msg)
         except openai.AuthenticationError as e:
             error_msg = "API认证错误: API Key无效或已过期。请检查设置。"
             print(f"[云岚AI] {error_msg} - {e}")
-            return (error_msg, torch.zeros((1, 64, 64, 3)))
+            return safe_return_with_image(error_msg)
         except openai.RateLimitError as e:
             error_msg = "API速率限制错误: 已超出您的配额。请检查您的账户用量。"
             print(f"[云岚AI] {error_msg} - {e}")
-            return (error_msg, torch.zeros((1, 64, 64, 3)))
+            return safe_return_with_image(error_msg)
         except openai.APIStatusError as e:
             error_msg = f"API状态错误: {e.status_code} - {e.response.text}"
             print(f"[云岚AI] {error_msg}")
-            return (error_msg, torch.zeros((1, 64, 64, 3)))
+            return safe_return_with_image(error_msg)
         except Exception as e:
             error_msg = f"运行对话节点时发生未知错误: {e}"
             print(f"[云岚AI] {error_msg}")
             import traceback
             traceback.print_exc()
-            return (error_msg, torch.zeros((1, 64, 64, 3)))
+            return safe_return_with_image(error_msg)
 
 class YunlanSmartImageSelector:
     MAX_INPUTS = 10  # Set a reasonable maximum for performance
@@ -306,8 +350,9 @@ class YunlanSmartImageSelector:
         # 如果选择的图片不可用，返回黑色图像
         if selected_image is None:
             print(f"[云岚AI] 警告: 选择的图片 '{selection_idx}' 未连接或为空，将输出一个黑色图像。")
-            return (torch.zeros((1, 64, 64, 3), dtype=torch.float32, device="cpu"),)
-        
+            empty_img = create_empty_image()
+            return (empty_img,) if empty_img is not None else (None,)
+
         print(f"[云岚AI] 已选择图片: {selection_idx}")
         return (selected_image,)
 
@@ -369,7 +414,8 @@ class DynamicImageSelector:
         # 如果没有连接任何图片，返回黑色图像
         if not connected_images:
             print(f"[云岚AI] 警告: 未连接任何图片输入，将输出一个黑色图像。")
-            return (torch.zeros((1, 64, 64, 3), dtype=torch.float32, device="cpu"),)
+            empty_img = create_empty_image()
+            return (empty_img,) if empty_img is not None else (None,)
 
         # 确定最大索引
         max_index = max(connected_images.keys()) if connected_images else -1
@@ -392,7 +438,8 @@ class DynamicImageSelector:
         # 如果选择的图片不可用（这种情况应该不会发生，因为我们已经检查了），返回黑色图像
         if selected_image is None:
             print(f"[云岚AI] 警告: 选择的图片 '{selection_idx}' 未连接或为空，将输出一个黑色图像。")
-            return (torch.zeros((1, 64, 64, 3), dtype=torch.float32, device="cpu"),)
+            empty_img = create_empty_image()
+            return (empty_img,) if empty_img is not None else (None,)
         
         print(f"[云岚AI] 已选择图片索引: {selection_idx}，可用图片: {sorted(connected_images.keys())}")
         return (selected_image,)
@@ -431,9 +478,25 @@ class YunlanImageCombiner:
     CATEGORY = "云岚AI"
 
     def combine_images(self, 原图, 拼接图片, 拼接方向, 原图最大尺寸):
-        # 转换为PIL图像进行处理
-        base_img = self.tensor_to_pil(原图)
-        append_img = self.tensor_to_pil(拼接图片)
+        # 检查依赖
+        if Image is None:
+            error_msg = "错误: PIL库未安装，请运行: pip install Pillow>=8.0.0"
+            print(f"[云岚AI] {error_msg}")
+            return safe_return_with_image(error_msg)
+
+        if torch is None or np is None:
+            error_msg = "错误: PyTorch或NumPy库未安装"
+            print(f"[云岚AI] {error_msg}")
+            return safe_return_with_image(error_msg)
+
+        try:
+            # 转换为PIL图像进行处理
+            base_img = self.tensor_to_pil(原图)
+            append_img = self.tensor_to_pil(拼接图片)
+        except Exception as e:
+            error_msg = f"错误: 转换图像时发生错误 - {e}"
+            print(f"[云岚AI] {error_msg}")
+            return safe_return_with_image(error_msg)
         
         # 调整原图大小，保持纵横比
         base_img = self.resize_keep_aspect_ratio(base_img, 原图最大尺寸)
@@ -479,12 +542,18 @@ class YunlanImageCombiner:
     
     def tensor_to_pil(self, tensor):
         # 转换tensor为PIL图像
+        if torch is None or np is None or Image is None:
+            raise ImportError("缺少必要的库: PyTorch, NumPy 或 PIL")
+
         i = 255. * tensor.cpu().numpy().squeeze()
         img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
         return img
-    
+
     def pil_to_tensor(self, image):
         # 转换PIL图像回tensor
+        if torch is None or np is None:
+            raise ImportError("缺少必要的库: PyTorch 或 NumPy")
+
         image = np.array(image).astype(np.float32) / 255.0
         image = torch.from_numpy(image)[None,]
         return image

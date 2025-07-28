@@ -187,13 +187,26 @@ async def get_prompt_names(request):
         return web.json_response({'status': 'error', 'message': f'获取失败: {str(e)}'}, status=500)
 
 # --- Node and Route Registration ---
-from .nodes import api_nodes
+try:
+    from .nodes import api_nodes
 
-# 确保节点映射正确导出
-NODE_CLASS_MAPPINGS = {**api_nodes.NODE_CLASS_MAPPINGS}
-NODE_DISPLAY_NAME_MAPPINGS = {**api_nodes.NODE_DISPLAY_NAME_MAPPINGS}
-print(f"[云岚AI] 成功注册 {len(NODE_CLASS_MAPPINGS)} 个节点")
-print(f"[云岚AI] 节点列表: {list(NODE_CLASS_MAPPINGS.keys())}")
+    # 确保节点映射正确导出
+    NODE_CLASS_MAPPINGS = {**api_nodes.NODE_CLASS_MAPPINGS}
+    NODE_DISPLAY_NAME_MAPPINGS = {**api_nodes.NODE_DISPLAY_NAME_MAPPINGS}
+    print(f"[云岚AI] 成功注册 {len(NODE_CLASS_MAPPINGS)} 个节点")
+    print(f"[云岚AI] 节点列表: {list(NODE_CLASS_MAPPINGS.keys())}")
+
+except ImportError as e:
+    print(f"[云岚AI] 错误: 无法导入节点模块 - {e}")
+    print("[云岚AI] 提供空的节点映射以防止ComfyUI崩溃")
+    NODE_CLASS_MAPPINGS = {}
+    NODE_DISPLAY_NAME_MAPPINGS = {}
+except Exception as e:
+    print(f"[云岚AI] 错误: 注册节点时发生未知错误 - {e}")
+    import traceback
+    traceback.print_exc()
+    NODE_CLASS_MAPPINGS = {}
+    NODE_DISPLAY_NAME_MAPPINGS = {}
 
 WEB_DIRECTORY = "js"
 
