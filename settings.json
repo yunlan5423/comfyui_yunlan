@@ -1,0 +1,15 @@
+{
+    "apiUrl": "https://yunwu.ai/v1",
+    "apiKey": "sk-9q7eNXj3vuQPQnamy4QeSrxdTrDusQ44X1Vhg9oWtwmAFnqZ",
+    "modelList": [
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4.1-2025-04-14",
+        "gpt-4.1-mini-2025-04-14",
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gpt-4",
+        "gpt-3.5-turbo"
+    ],
+    "apiModel": "gpt-4o-mini"
+}
