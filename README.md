@@ -1,11 +1,13 @@
-# ComfyUI-YunLanFY
+# ComfyUI-云岚AI
 
-一个功能丰富的ComfyUI自定义节点集合，旨在增强ComfyUI的功能和使用体验。
+一个功能丰富的ComfyUI自定义节点集合，专注于AI对话和智能图像处理功能。
 
 ## 功能特点
 
-- **文本处理节点**: 提供文本连接、JSON转换等功能
-- **图像处理节点**: 提供图像效果处理、图像信息获取等功能
+- **AI对话节点**: 支持多种AI模型的对话功能，可处理文本和图像输入
+- **智能选择节点**: 提供动态图像选择和文本选择功能
+- **图像处理节点**: 提供图像拼接和组合功能
+- **提示词管理**: 内置提示词管理系统，支持动态加载和保存
 - **自定义UI**: 美观的节点样式和交互界面
 - **易于扩展**: 模块化设计，便于添加新功能
 
@@ -20,51 +22,101 @@
 
 ```bash
 cd /path/to/ComfyUI/custom_nodes
-git clone https://github.com/yunlanfy/comfyui_yunlanfy.git
-cd comfyui_yunlanfy
-# 如果需要安装依赖（目前无特殊依赖）
-# pip install -r requirements.txt
+git clone https://github.com/yunlanfy/comfyui_yunlan.git
+cd comfyui_yunlan
+# 安装依赖
+pip install -r requirements.txt
 ```
 
 ## 节点介绍
 
-### 文本处理
+### AI对话节点
 
-- **文本连接 (TextConcatenate)**: 连接两段文本，可自定义分隔符
-- **文本转JSON (TextToJson)**: 将文本字符串转换为格式化的JSON
+- **云岚_AI对话**: 支持多种AI模型的对话功能
+  - 支持文本和图像输入
+  - 可配置不同的AI模型（GPT-4、GPT-3.5、Gemini等）
+  - 内置提示词管理系统
+  - 支持多图像同时输入
 
-### 图像处理
+### 智能选择节点
 
-- **图像信息 (ImageInfo)**: 获取图像的基本信息（尺寸、通道等）
-- **简单图像效果 (SimpleImageEffect)**: 提供亮度调整、反色、灰度转换等简单图像效果
+- **云岚_条件选图**: 动态图像选择器
+  - 支持多个图像输入端口
+  - 动态添加输入端口
+  - 智能索引选择
+
+- **云岚_条件选词**: 动态文本选择器
+  - 支持多个文本输入端口
+  - 动态添加输入端口
+  - 智能索引选择
+
+### 图像处理节点
+
+- **云岚_拼图**: 图像拼接节点
+  - 支持上下左右四个方向拼接
+  - 自动调整图像尺寸
+  - 保持纵横比
 
 ## 使用示例
 
-### 文本处理示例
+### AI对话示例
 
-1. 添加"文本连接"节点
-2. 设置两个输入文本和分隔符
-3. 连接到其他需要文本输入的节点（如提示词）
+1. 添加"云岚_AI对话"节点
+2. 在设置中配置API Key和API URL
+3. 选择AI模型和提示词
+4. 可选择连接图像输入
+5. 输入附加文本
+6. 获得AI生成的文本回复
 
-### 图像处理示例
+### 图像选择示例
 
-1. 添加"简单图像效果"节点
-2. 将图像连接到节点输入
-3. 选择效果类型并调整强度
-4. 将处理后的图像连接到其他节点（如保存图像）
+1. 添加"云岚_条件选图"节点
+2. 连接多个图像到输入端口
+3. 设置选择索引
+4. 输出选中的图像
+
+### 图像拼接示例
+
+1. 添加"云岚_拼图"节点
+2. 连接原图和要拼接的图片
+3. 选择拼接方向（上、下、左、右）
+4. 设置原图最大尺寸
+5. 获得拼接后的图像
+
+## 配置说明
+
+### API设置
+
+在使用AI对话功能前，需要配置API设置：
+
+1. API URL: 设置AI服务的API地址
+2. API Key: 设置有效的API密钥
+3. 模型列表: 配置可用的AI模型列表
+
+### 提示词管理
+
+支持自定义提示词管理：
+
+1. 可以添加、编辑、删除提示词
+2. 支持分类管理
+3. 提示词会自动保存到本地
 
 ## 开发指南
 
 ### 项目结构
 
 ```
-comfyui_yunlanfy/
+comfyui_yunlan/
 ├── nodes/             # Python节点代码
-│   ├── basic_nodes.py # 基础节点集合
+│   ├── api_nodes.py   # AI对话和智能选择节点
 │   └── template_node.py # 节点模板
 ├── js/                # 前端JavaScript代码
-│   └── yunlanfy.js    # 前端界面和交互
+│   ├── yunlanfy.js    # 前端界面和交互
+│   └── prompt_manager.js # 提示词管理
 ├── __init__.py        # 插件入口文件
+├── settings.json      # API设置配置
+├── prompts.json       # 提示词配置
+├── requirements.txt   # 依赖包列表
 └── README.md          # 项目说明
 ```
 
@@ -79,12 +131,22 @@ comfyui_yunlanfy/
 
 在`js/yunlanfy.js`中可以添加自定义UI组件和交互逻辑。
 
+## 依赖要求
+
+- Python 3.7+
+- ComfyUI
+- openai >= 1.0.0
+- requests >= 2.25.0
+- Pillow >= 8.0.0
+- torch
+- numpy
+
 ## 许可证
 
 MIT
 
 ## 联系方式
 
-GitHub: [https://github.com/yunlanfy/comfyui_yunlanfy](https://github.com/yunlanfy/comfyui_yunlanfy)
+GitHub: [https://github.com/yunlanfy/comfyui_yunlan](https://github.com/yunlanfy/comfyui_yunlan)
 
-如有问题或建议，请提交Issue或PR。 
+如有问题或建议，请提交Issue或PR。

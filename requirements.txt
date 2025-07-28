@@ -1,0 +1,16 @@
+# ComfyUI-云岚AI 依赖包
+# AI API 客户端
+openai>=1.0.0
+
+# HTTP 请求库
+requests>=2.25.0
+
+# 图像处理库
+Pillow>=8.0.0
+
+# 数值计算库 (通常由ComfyUI提供)
+# torch>=1.9.0
+# numpy>=1.21.0
+
+# 异步HTTP库 (通常由ComfyUI提供)
+# aiohttp>=3.7.0

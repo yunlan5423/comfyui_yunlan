@@ -2,14 +2,31 @@
 API节点模块
 包含与API交互的节点
 """
-import requests
+
+# 导入检查和错误处理
+try:
+    import requests
+except ImportError:
+    print("[云岚AI] 错误: 缺少 requests 库，请运行: pip install requests>=2.25.0")
+    requests = None
+
+try:
+    import openai
+except ImportError:
+    print("[云岚AI] 错误: 缺少 openai 库，请运行: pip install openai>=1.0.0")
+    openai = None
+
+try:
+    from PIL import Image
+except ImportError:
+    print("[云岚AI] 错误: 缺少 Pillow 库，请运行: pip install Pillow>=8.0.0")
+    Image = None
+
 import json
 import base64
-from PIL import Image
 import io
 import torch
 import numpy as np
-import openai
 
 from .. import get_api_settings, get_prompts
 
@@ -32,22 +49,30 @@ def sanitize_base_url(url):
 
 # Helper function to convert tensor to base64
 def tensor_to_base64(tensor):
-    # Convert tensor to numpy array
-    np_array = tensor.squeeze(0).cpu().numpy()
-    
-    # Ensure the values are in the 0-255 range and uint8 type
-    np_array = (np_array * 255).astype(np.uint8)
-    
-    # Create PIL Image from numpy array
-    image = Image.fromarray(np_array)
-    
-    # Save image to a byte buffer
-    buffered = io.BytesIO()
-    image.save(buffered, format="PNG")
-    
-    # Get base64 representation
-    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{img_str}"
+    """安全地将tensor转换为base64编码的图像"""
+    try:
+        if Image is None:
+            raise ImportError("PIL库未安装")
+
+        # Convert tensor to numpy array
+        np_array = tensor.squeeze(0).cpu().numpy()
+
+        # Ensure the values are in the 0-255 range and uint8 type
+        np_array = (np_array * 255).astype(np.uint8)
+
+        # Create PIL Image from numpy array
+        image = Image.fromarray(np_array)
+
+        # Save image to a byte buffer
+        buffered = io.BytesIO()
+        image.save(buffered, format="PNG")
+
+        # Get base64 representation
+        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        return f"data:image/png;base64,{img_str}"
+    except Exception as e:
+        print(f"[云岚AI] 错误: 转换图像为base64时发生错误 - {e}")
+        raise
 
 class YunlanAIDialog:
     @classmethod
@@ -121,40 +146,63 @@ class YunlanAIDialog:
     def run_dialog(self, 模型, 提示词, 附加文本, 图片1=None, 图片2=None, prompt_id=None, node_id=None, preview=None):
         base_url = None  # Define for access in exception handlers
         try:
+            # 检查依赖
+            if openai is None:
+                return ("错误: OpenAI库未安装，请运行: pip install openai>=1.0.0", torch.zeros((1, 64, 64, 3)))
+
             # 1. 加载并修正设置
             settings = get_api_settings()
+            if not settings:
+                return ("错误: 无法加载API设置，请检查settings.json文件。", torch.zeros((1, 64, 64, 3)))
+
             api_key = settings.get("apiKey")
             raw_base_url = settings.get("apiUrl")
 
-            if not api_key or not raw_base_url:
-                return ("错误: 请在ComfyUI设置中配置云岚AI的API Key和API URL。", torch.zeros((1, 64, 64, 3)))
+            if not api_key:
+                return ("错误: 请在settings.json中配置API Key。", torch.zeros((1, 64, 64, 3)))
+            if not raw_base_url:
+                return ("错误: 请在settings.json中配置API URL。", torch.zeros((1, 64, 64, 3)))
 
             base_url = sanitize_base_url(raw_base_url)
             print(f"[云岚AI] 原始API URL: '{raw_base_url}', 修正后URL: '{base_url}'")
 
             # 2. 初始化OpenAI客户端
-            client = openai.OpenAI(api_key=api_key, base_url=base_url)
+            try:
+                client = openai.OpenAI(api_key=api_key, base_url=base_url)
+            except Exception as e:
+                return (f"错误: 无法初始化OpenAI客户端 - {e}", torch.zeros((1, 64, 64, 3)))
 
             # 3. 构建提示
-            prompts_dict = get_prompts()
-            prompt_content = prompts_dict.get(提示词, 提示词)
-            full_prompt = prompt_content + 附加文本
-            
-            print(f"[云岚AI] 对话节点运行: 模型={模型}")
-            print(f"[云岚AI] 完整提示: {full_prompt}")
+            try:
+                prompts_dict = get_prompts()
+                prompt_content = prompts_dict.get(提示词, 提示词)
+                full_prompt = prompt_content + 附加文本
+
+                print(f"[云岚AI] 对话节点运行: 模型={模型}")
+                print(f"[云岚AI] 完整提示: {full_prompt}")
+            except Exception as e:
+                print(f"[云岚AI] 警告: 构建提示时发生错误 - {e}")
+                full_prompt = 提示词 + 附加文本
 
             # 4. 构建API请求内容
             messages_content = [{"type": "text", "text": full_prompt}]
 
-            if 图片1 is not None:
-                print("[云岚AI] 正在处理图片1...")
-                base64_image = tensor_to_base64(图片1)
-                messages_content.append({"type": "image_url", "image_url": {"url": base64_image}})
-            
-            if 图片2 is not None:
-                print("[云岚AI] 正在处理图片2...")
-                base64_image_2 = tensor_to_base64(图片2)
-                messages_content.append({"type": "image_url", "image_url": {"url": base64_image_2}})
+            # 安全地处理图片输入
+            try:
+                if 图片1 is not None:
+                    print("[云岚AI] 正在处理图片1...")
+                    base64_image = tensor_to_base64(图片1)
+                    messages_content.append({"type": "image_url", "image_url": {"url": base64_image}})
+            except Exception as e:
+                print(f"[云岚AI] 警告: 处理图片1时发生错误 - {e}")
+
+            try:
+                if 图片2 is not None:
+                    print("[云岚AI] 正在处理图片2...")
+                    base64_image_2 = tensor_to_base64(图片2)
+                    messages_content.append({"type": "image_url", "image_url": {"url": base64_image_2}})
+            except Exception as e:
+                print(f"[云岚AI] 警告: 处理图片2时发生错误 - {e}")
 
 
             # 5. 调用API
@@ -543,16 +591,16 @@ class DynamicTextSelector:
 
 NODE_CLASS_MAPPINGS = {
     "云岚_AI对话": YunlanAIDialog,
-    "云岚_智能选图": DynamicImageSelector,
+    "云岚_条件选图": DynamicImageSelector,
     "云岚_条件选词": DynamicTextSelector,
     "云岚_拼图": YunlanImageCombiner,
-   
+
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "云岚_AI对话": "云岚_AI对话",
-    "云岚_智能选图": "云岚_条件选图",
+    "云岚_条件选图": "云岚_条件选图",
     "云岚_条件选词": "云岚_条件选词",
     "云岚_拼图": "云岚_拼图",
-    
-} 
+
+}
