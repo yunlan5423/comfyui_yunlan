@@ -37,12 +37,14 @@ except ImportError:
 import json
 import base64
 import io
+import random
+import html
+import re
 
 # 安全导入父模块的函数
 try:
     from .. import get_api_settings, get_prompts
 except ImportError as e:
-    print(f"[云岚AI] 警告: 无法导入父模块函数 - {e}")
     # 提供备用函数
     def get_api_settings():
         return {}
@@ -58,13 +60,40 @@ def create_empty_image():
         print("[云岚AI] 警告: PyTorch不可用，无法创建图像tensor")
         return None
 
-def safe_return_with_image(text_result):
+def clean_text_for_ui(text):
+    """清理文本以防止UI错乱"""
+    if not text:
+        return ""
+
+    # 转换为字符串
+    text = str(text)
+
+    # 移除或转义HTML标签
+    text = html.escape(text)
+
+    # 移除控制字符（保留换行符和制表符）
+    text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
+
+    # 限制文本长度（防止超长文本导致UI问题）
+    max_length = 50000  # 50K字符限制
+    if len(text) > max_length:
+        text = text[:max_length] + "\n\n[文本过长，已截断...]"
+
+    # 规范化换行符
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+
+    return text
+
+def safe_return_with_image(text_result, seed_value=0):
     """安全地返回带图像的结果，处理torch不可用的情况"""
+    # 清理文本以防止UI错乱
+    cleaned_text = clean_text_for_ui(text_result)
+
     empty_img = create_empty_image()
     if empty_img is not None:
-        return (text_result, empty_img)
+        return (cleaned_text, empty_img, seed_value)
     else:
-        return (text_result,)
+        return (cleaned_text, seed_value)
 
 # Helper function to sanitize the base URL
 def sanitize_base_url(url):
@@ -147,6 +176,8 @@ class YunlanAIDialog:
                     "模型": (models,),
                     "提示词": (prompt_names,),
                     "附加文本": ("STRING", {"multiline": True, "default": ""}),
+                    "种子模式": (["随机", "固定"],),
+                    "种子": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 },
                 "optional": {
                     "图片1": ("IMAGE",),
@@ -166,6 +197,8 @@ class YunlanAIDialog:
                     "模型": (["gpt-4o"],),
                     "提示词": (["默认提示词"],),
                     "附加文本": ("STRING", {"multiline": True, "default": ""}),
+                    "种子模式": (["随机", "固定"],),
+                    "种子": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 },
                 "optional": {
                     "图片1": ("IMAGE",),
@@ -178,12 +211,12 @@ class YunlanAIDialog:
                 },
             }
 
-    RETURN_TYPES = ("STRING", "IMAGE")
-    RETURN_NAMES = ("文本", "图片")
+    RETURN_TYPES = ("STRING", "IMAGE", "INT")
+    RETURN_NAMES = ("文本", "图片", "使用的种子")
     FUNCTION = "run_dialog"
     CATEGORY = "云岚AI"
 
-    def run_dialog(self, 模型, 提示词, 附加文本, 图片1=None, 图片2=None, prompt_id=None, node_id=None, preview=None):
+    def run_dialog(self, 模型, 提示词, 附加文本, 种子模式, 种子, 图片1=None, 图片2=None, prompt_id=None, node_id=None, preview=None):
         base_url = None  # Define for access in exception handlers
 
         try:
@@ -192,7 +225,7 @@ class YunlanAIDialog:
                 return safe_return_with_image("错误: OpenAI库未安装，请运行: pip install openai>=1.0.0")
 
             if torch is None:
-                return ("错误: PyTorch库未安装，这通常由ComfyUI提供",)
+                return safe_return_with_image("错误: PyTorch库未安装，这通常由ComfyUI提供")
 
             # 1. 加载并修正设置
             settings = get_api_settings()
@@ -208,7 +241,6 @@ class YunlanAIDialog:
                 return safe_return_with_image("错误: 请在settings.json中配置API URL。")
 
             base_url = sanitize_base_url(raw_base_url)
-            print(f"[云岚AI] 原始API URL: '{raw_base_url}', 修正后URL: '{base_url}'")
 
             # 2. 初始化OpenAI客户端
             try:
@@ -222,8 +254,6 @@ class YunlanAIDialog:
                 prompt_content = prompts_dict.get(提示词, 提示词)
                 full_prompt = prompt_content + 附加文本
 
-                print(f"[云岚AI] 对话节点运行: 模型={模型}")
-                print(f"[云岚AI] 完整提示: {full_prompt}")
             except Exception as e:
                 print(f"[云岚AI] 警告: 构建提示时发生错误 - {e}")
                 full_prompt = 提示词 + 附加文本
@@ -234,7 +264,6 @@ class YunlanAIDialog:
             # 安全地处理图片输入
             try:
                 if 图片1 is not None:
-                    print("[云岚AI] 正在处理图片1...")
                     base64_image = tensor_to_base64(图片1)
                     messages_content.append({"type": "image_url", "image_url": {"url": base64_image}})
             except Exception as e:
@@ -242,38 +271,51 @@ class YunlanAIDialog:
 
             try:
                 if 图片2 is not None:
-                    print("[云岚AI] 正在处理图片2...")
                     base64_image_2 = tensor_to_base64(图片2)
                     messages_content.append({"type": "image_url", "image_url": {"url": base64_image_2}})
             except Exception as e:
-                print(f"[云岚AI] 警告: 处理图片2时发生错误 - {e}")
+                pass
 
+            # 5. 处理种子（仅用于工作流刷新，不传递给API）
+            actual_seed = 种子
+            if 种子模式 == "随机":
+                actual_seed = random.randint(0, 0xffffffffffffffff)
+            # 注意：种子仅用于ComfyUI工作流的刷新机制，不传递给API
 
-            # 5. 调用API
-            print("[云岚AI] 正在调用OpenAI API...")
+            # 6. 调用API
             response = client.chat.completions.create(
                 model=模型,
                 messages=[{"role": "user", "content": messages_content}],
                 max_tokens=2048,
             )
-            
+
             # 兼容处理不同格式的API响应
+            ai_response = None
             if hasattr(response, 'choices') and response.choices:
-                ai_response = response.choices[0].message.content
+                if response.choices[0].message and response.choices[0].message.content:
+                    ai_response = response.choices[0].message.content
+                else:
+                    error_msg = "错误: API返回了空的响应内容。"
+                    return safe_return_with_image(error_msg)
             elif isinstance(response, str):
                 ai_response = response # The response is already the string content
             else:
-                ai_response = f"错误: 收到未知的API响应格式。"
-                print(f"[云岚AI] 未知响应类型: {type(response)}")
-                print(f"[云岚AI] 原始响应: {response}")
+                error_msg = f"错误: 收到未知的API响应格式。"
+                return safe_return_with_image(error_msg)
 
-            print(f"[云岚AI] API响应成功: {ai_response}")
+            # 验证AI响应内容
+            if not ai_response or ai_response.strip() == "":
+                error_msg = "错误: AI返回了空的响应内容。"
+                print(f"[云岚AI] {error_msg}")
+                return safe_return_with_image(error_msg)
 
             # 6. 返回结果
-            output_text = ai_response
+            # 清理AI响应文本以防止UI错乱
+            cleaned_text = clean_text_for_ui(ai_response)
             output_image = create_empty_image()
 
-            return (output_text, output_image)
+            # 返回实际使用的种子，这样ComfyUI可以正确处理缓存和刷新
+            return (cleaned_text, output_image, actual_seed)
 
         except openai.APIConnectionError as e:
             error_msg = f"API连接错误: 无法连接到 {base_url or '未定义的URL'}。请检查API URL和网络连接。"
@@ -342,18 +384,14 @@ class YunlanSmartImageSelector:
         except (ValueError, TypeError):
             selection_idx = 0  # 转换失败时默认为0
         
-        print(f"[云岚AI] 图片数量: {image_count}, 选择索引: {selection_idx}")
-        
         # 获取选择的图片
         selected_image = kwargs.get(f"图片{selection_idx}")
-        
+
         # 如果选择的图片不可用，返回黑色图像
         if selected_image is None:
             print(f"[云岚AI] 警告: 选择的图片 '{selection_idx}' 未连接或为空，将输出一个黑色图像。")
             empty_img = create_empty_image()
             return (empty_img,) if empty_img is not None else (None,)
-
-        print(f"[云岚AI] 已选择图片: {selection_idx}")
         return (selected_image,)
 
 
@@ -441,7 +479,7 @@ class DynamicImageSelector:
             empty_img = create_empty_image()
             return (empty_img,) if empty_img is not None else (None,)
         
-        print(f"[云岚AI] 已选择图片索引: {selection_idx}，可用图片: {sorted(connected_images.keys())}")
+
         return (selected_image,)
 
 
@@ -654,7 +692,7 @@ class DynamicTextSelector:
         # 获取选择的文本
         selected_text = connected_texts[selection_idx]
         
-        print(f"[云岚AI] 已选择文本索引: {selection_idx}，可用文本索引: {valid_indices}")
+
         return (selected_text,)
 
 

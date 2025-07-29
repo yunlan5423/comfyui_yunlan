@@ -148,8 +148,9 @@ app.registerExtension({
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         // 检查是否为我们的节点
         if (nodeData.name === "云岚_AI对话") {
-            // 保存原始的onNodeCreated函数
+            // 保存原始的onNodeCreated和onExecuted函数
             const onNodeCreated = nodeType.prototype.onNodeCreated;
+            const onExecuted = nodeType.prototype.onExecuted;
             
             // 重写onNodeCreated函数
             nodeType.prototype.onNodeCreated = function() {
@@ -158,10 +159,12 @@ app.registerExtension({
                     onNodeCreated.apply(this, arguments);
                 }
                 
-                // 查找提示词下拉框和附加文本输入框
+                // 查找所有相关的widget
                 const promptWidget = this.widgets.find(w => w.name === "提示词");
                 const additionalTextWidget = this.widgets.find(w => w.name === "附加文本");
                 const modelWidget = this.widgets.find(w => w.name === "模型");
+                const seedModeWidget = this.widgets.find(w => w.name === "种子模式");
+                const seedWidget = this.widgets.find(w => w.name === "种子");
                 
                 // 创建提示词预览区域
                 if (promptWidget && additionalTextWidget) {
@@ -194,14 +197,21 @@ app.registerExtension({
                         const promptContent = pm.prompts[selectedPrompt] || selectedPrompt;
                         const fullPrompt = promptContent + additionalText;
                         
+                        // 安全地构建预览内容（防止HTML注入）
+                        const escapeHtml = (text) => {
+                            const div = document.createElement('div');
+                            div.textContent = text;
+                            return div.innerHTML;
+                        };
+
                         // 构建预览内容
-                        let previewText = `<strong>模型:</strong> ${selectedModel}<br>`;
-                        previewText += `<strong>提示词:</strong> ${promptContent}<br>`;
+                        let previewText = `<strong>模型:</strong> ${escapeHtml(selectedModel)}<br>`;
+                        previewText += `<strong>提示词:</strong> ${escapeHtml(promptContent)}<br>`;
                         if (additionalText) {
-                            previewText += `<strong>附加文本:</strong> ${additionalText}<br>`;
+                            previewText += `<strong>附加文本:</strong> ${escapeHtml(additionalText)}<br>`;
                         }
-                        previewText += `<strong>完整提示:</strong> ${fullPrompt}`;
-                        
+                        previewText += `<strong>完整提示:</strong> ${escapeHtml(fullPrompt)}`;
+
                         // 更新预览内容
                         previewContainer.innerHTML = previewText;
                     };
@@ -287,6 +297,39 @@ app.registerExtension({
                     
                     // 初始加载时更新一次
                     updatePromptDropdown(promptWidget);
+                }
+            };
+
+            // 添加节点执行完成后的回调，用于更新随机种子
+            nodeType.prototype.onExecuted = function(message) {
+                // 调用原始的onExecuted函数
+                if (onExecuted) {
+                    onExecuted.apply(this, arguments);
+                }
+
+                // 查找种子相关的widget
+                const seedModeWidget = this.widgets.find(w => w.name === "种子模式");
+                const seedWidget = this.widgets.find(w => w.name === "种子");
+
+                // 如果是随机模式，更新种子值
+                if (seedModeWidget && seedWidget && seedModeWidget.value === "随机") {
+                    // 生成新的随机种子
+                    const newSeed = Math.floor(Math.random() * 0xffffffffffffffff);
+
+                    // 更新种子widget的值
+                    seedWidget.value = newSeed;
+
+                    // 触发widget更新事件
+                    if (seedWidget.callback) {
+                        seedWidget.callback(newSeed);
+                    }
+
+                    // 标记画布需要重绘
+                    if (this.graph) {
+                        this.graph.setDirtyCanvas(true, true);
+                    }
+
+                    console.log(`[云岚AI] 随机种子已更新: ${newSeed}`);
                 }
             };
         }
@@ -682,14 +725,21 @@ function createPromptDialog(node, widget) {
                     const promptContent = pm.prompts[selectedPrompt] || selectedPrompt;
                     const fullPrompt = promptContent + additionalText;
                     
+                    // 安全地构建预览内容（防止HTML注入）
+                    const escapeHtml = (text) => {
+                        const div = document.createElement('div');
+                        div.textContent = text;
+                        return div.innerHTML;
+                    };
+
                     // 构建预览内容
-                    let previewText = `<strong>模型:</strong> ${selectedModel}<br>`;
-                    previewText += `<strong>提示词:</strong> ${promptContent}<br>`;
+                    let previewText = `<strong>模型:</strong> ${escapeHtml(selectedModel)}<br>`;
+                    previewText += `<strong>提示词:</strong> ${escapeHtml(promptContent)}<br>`;
                     if (additionalText) {
-                        previewText += `<strong>附加文本:</strong> ${additionalText}<br>`;
+                        previewText += `<strong>附加文本:</strong> ${escapeHtml(additionalText)}<br>`;
                     }
-                    previewText += `<strong>完整提示:</strong> ${fullPrompt}`;
-                    
+                    previewText += `<strong>完整提示:</strong> ${escapeHtml(fullPrompt)}`;
+
                     // 更新预览内容
                     previewContainer.innerHTML = previewText;
                 }

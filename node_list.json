@@ -1,21 +1,23 @@
 {
     "云岚_AI对话": {
         "display_name": "云岚_AI对话",
-        "description": "支持多种AI模型的对话功能，可处理文本和图像输入",
+        "description": "支持多种AI模型的对话功能，可处理文本和图像输入，支持随机种子和固定种子",
         "category": "云岚AI",
         "input_types": {
             "required": {
                 "模型": "STRING",
-                "提示词": "STRING", 
-                "附加文本": "STRING"
+                "提示词": "STRING",
+                "附加文本": "STRING",
+                "种子模式": "STRING",
+                "种子": "INT"
             },
             "optional": {
                 "图片1": "IMAGE",
                 "图片2": "IMAGE"
             }
         },
-        "output_types": ["STRING", "IMAGE"],
-        "output_names": ["文本", "图片"]
+        "output_types": ["STRING", "IMAGE", "INT"],
+        "output_names": ["文本", "图片", "使用的种子"]
     },
     "云岚_条件选图": {
         "display_name": "云岚_条件选图",
