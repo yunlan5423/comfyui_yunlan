@@ -249,14 +249,28 @@ class YunlanAIDialog:
                 return safe_return_with_image(f"错误: 无法初始化OpenAI客户端 - {e}")
 
             # 3. 构建提示
+            prompt_content = ""
             try:
                 prompts_dict = get_prompts()
-                prompt_content = prompts_dict.get(提示词, 提示词)
-                full_prompt = prompt_content + 附加文本
-
+                if isinstance(prompts_dict, dict) and 提示词 in prompts_dict:
+                    prompt_content = prompts_dict[提示词]
+                else:
+                    # 提示词不在字典中，使用提示词名称作为内容
+                    prompt_content = 提示词
             except Exception as e:
                 print(f"[云岚AI] 警告: 构建提示时发生错误 - {e}")
-                full_prompt = 提示词 + 附加文本
+                # 异常情况下，安全地使用提示词名称作为内容
+                prompt_content = 提示词 if 提示词 else ""
+
+            # 确保prompt_content是字符串类型
+            if not isinstance(prompt_content, str):
+                prompt_content = str(prompt_content) if prompt_content else ""
+
+            # 确保附加文本是字符串类型
+            附加文本_safe = str(附加文本) if 附加文本 else ""
+
+            # 构建完整提示
+            full_prompt = prompt_content + 附加文本_safe
 
             # 4. 构建API请求内容
             messages_content = [{"type": "text", "text": full_prompt}]
